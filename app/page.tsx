@@ -1,65 +1,174 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AgentCard } from "@/src/components/AgentCard";
+import { PulseCheckHeader } from "@/src/components/PulseCheckHeader";
+import { SearchHero } from "@/src/components/SearchHero";
+
+type AgentResult = {
+  alpha: string;
+  beta: string;
+  alphaConfidence: number;
+  betaConfidence: number;
+};
+
+function generateMarketAnalysis(topic: string): AgentResult {
+  const q = topic.trim();
+  const headline = q.length ? q : "the market";
+  const lower = headline.toLowerCase();
+
+  const riskContext = lower.includes("ai")
+    ? "AI-linked tokens remain sensitivity-heavy to narrative rotation and quarterly product releases."
+    : lower.includes("eth") || lower.includes("ethereum")
+      ? "Ethereum sensitivity centers on staking flows, L2 activity, and fee compression regimes."
+      : lower.includes("sol") || lower.includes("solana")
+        ? "Solana remains highly momentum-driven with pronounced retail flow reflexivity."
+        : lower.includes("btc") || lower.includes("bitcoin")
+          ? "Bitcoin typically leads macro risk repricing and liquidity beta across majors."
+          : "The setup is driven by cross-asset liquidity, positioning concentration, and catalyst quality.";
+
+  const alphaConfidence = 62 + ((headline.length * 7) % 25);
+  const betaConfidence = 55 + ((headline.length * 5) % 30);
+
+  const alpha = `Thesis (Alpha): ${headline} shows constructive upside potential if liquidity remains supportive and headline risk stays contained.\n\nMarket read\n${riskContext}\nOrder-flow character looks healthier when dips are absorbed quickly and open interest expands without extreme funding.\n\nBullish catalysts\n- Momentum continuation above recent acceptance zones\n- Improving social + on-chain engagement quality\n- Positive reflexive loop: strength attracts incremental spot demand\n\nPositioning framework\n- Prefer staged entries on pullbacks into support\n- Add only after confirmation closes above resistance\n- De-risk into extension moves to protect realized gains\n\nInvalidation\n- Repeated rejection at reclaim levels with weakening breadth\n- Sharp rise in leverage without matching spot demand`;
+
+  const beta = `Thesis (Beta): ${headline} remains vulnerable to downside repricing while macro uncertainty and crowded narratives stay elevated.\n\nRisk read\n${riskContext}\nCurrent structure can degrade quickly if liquidity thins, especially when positioning gets one-sided and catalysts disappoint.\n\nBearish triggers\n- Loss of key support with broad market correlation uptick\n- Rising funding while spot volume fades (late-cycle squeeze risk)\n- Defensive macro tape: stronger dollar, higher real yields\n\nRisk management view\n- Treat weak bounces as distribution unless breadth recovers\n- Keep tighter stops around event windows\n- Prefer hedged or reduced gross exposure in choppy ranges\n\nWhat flips this view\n- Sustained reclaim + hold above major resistance\n- Healthier breadth and persistent spot-led accumulation`;
+
+  return { alpha, beta, alphaConfidence, betaConfidence };
+}
+
+export default function HomePage() {
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "scanning" | "streaming">("idle");
+  const [searchKey, setSearchKey] = useState(0);
+  const [alphaText, setAlphaText] = useState(
+    "Enter a topic above to stream Alpha's bullish read."
+  );
+  const [betaText, setBetaText] = useState(
+    "Enter a topic above to stream Beta's bearish read."
+  );
+  const [alphaConfidence, setAlphaConfidence] = useState(0);
+  const [betaConfidence, setBetaConfidence] = useState(0);
+  const [spotlight, setSpotlight] = useState({ x: -300, y: -300 });
+
+  const doneRef = useRef({ alpha: false, beta: false });
+  const timerRef = useRef<number | null>(null);
+
+  const hasQuery = useMemo(() => query.trim().length > 0, [query]);
+
+  useEffect(() => {
+    function handleMove(e: MouseEvent) {
+      setSpotlight({ x: e.clientX, y: e.clientY });
+    }
+
+    window.addEventListener("mousemove", handleMove);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  function startSearch() {
+    if (!hasQuery) return;
+
+    const outputs = generateMarketAnalysis(query);
+    doneRef.current = { alpha: false, beta: false };
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+    }
+
+    setSearching(true);
+    setPhase("scanning");
+    setSearchKey((k) => k + 1);
+    setAlphaText("Scanning Markets...");
+    setBetaText("Scanning Markets...");
+    setAlphaConfidence(outputs.alphaConfidence);
+    setBetaConfidence(outputs.betaConfidence);
+
+    timerRef.current = window.setTimeout(() => {
+      setPhase("streaming");
+      setAlphaText(outputs.alpha);
+      setBetaText(outputs.beta);
+    }, 2000);
+  }
+
+  const handleStreamDone = useCallback((which: "alpha" | "beta") => {
+    if (phase !== "streaming") return;
+    doneRef.current = { ...doneRef.current, [which]: true };
+    if (doneRef.current.alpha && doneRef.current.beta) {
+      setSearching(false);
+      setPhase("idle");
+    }
+  }, [phase]);
+
+  const handleAlphaDone = useCallback(() => {
+    handleStreamDone("alpha");
+  }, [handleStreamDone]);
+
+  const handleBetaDone = useCallback(() => {
+    handleStreamDone("beta");
+  }, [handleStreamDone]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="relative min-h-screen overflow-hidden">
+      <div
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          background: `radial-gradient(260px circle at ${spotlight.x}px ${spotlight.y}px, rgba(34,211,238,0.16), rgba(34,211,238,0.06) 35%, transparent 72%)`,
+        }}
+      />
+      <PulseCheckHeader />
+
+      <main className="relative z-10 mx-auto w-full max-w-6xl">
+        <SearchHero
+          query={query}
+          onQueryChange={setQuery}
+          onSearch={startSearch}
+          searching={searching}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        <section className="px-5 pb-16">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <AgentCard
+              title="Agent Alpha"
+              tone="bullish"
+              status={
+                phase === "scanning"
+                  ? "Scanning Markets..."
+                  : searching
+                    ? "Streaming analysis..."
+                    : "Ready."
+              }
+              isStreaming={phase === "streaming"}
+              searchKey={searchKey}
+              text={alphaText}
+              confidence={alphaConfidence}
+              onStreamDone={handleAlphaDone}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+            <AgentCard
+              title="Agent Beta"
+              tone="bearish"
+              status={
+                phase === "scanning"
+                  ? "Scanning Markets..."
+                  : searching
+                    ? "Streaming analysis..."
+                    : "Ready."
+              }
+              isStreaming={phase === "streaming"}
+              searchKey={searchKey}
+              text={betaText}
+              confidence={betaConfidence}
+              onStreamDone={handleBetaDone}
+            />
+          </div>
+        </section>
       </main>
     </div>
   );
 }
+
