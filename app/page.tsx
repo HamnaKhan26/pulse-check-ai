@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentCard } from "@/src/components/AgentCard";
+import { DebateChat } from "@/src/components/DebateChat";
 import { PulseCheckHeader } from "@/src/components/PulseCheckHeader";
 import { SearchHero } from "@/src/components/SearchHero";
 
@@ -114,7 +115,7 @@ export default function HomePage() {
   }, [handleStreamDone]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div className="relative min-h-screen overflow-x-hidden pb-8">
       <div
         className="pointer-events-none fixed inset-0 z-0"
         style={{
@@ -166,6 +167,17 @@ export default function HomePage() {
               onStreamDone={handleBetaDone}
             />
           </div>
+
+          <DebateChat
+            topic={query}
+            lockReason={
+              searchKey === 0
+                ? "need_analysis"
+                : searching
+                  ? "busy"
+                  : null
+            }
+          />
         </section>
       </main>
     </div>
